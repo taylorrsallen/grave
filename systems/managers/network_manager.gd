@@ -2,6 +2,7 @@ class_name NetworkManager extends Node
 
 # (({[%%%(({[=======================================================================================================================]}))%%%]}))
 signal state_changed()
+signal server_started()
 
 # (({[%%%(({[=======================================================================================================================]}))%%%]}))
 const PEER_CONNECTION: PackedScene = preload("res://systems/controller/player/peer_connection.scn")
@@ -57,6 +58,7 @@ func create_server() -> void:
 	
 	_create_peer_connection(1)
 	
+	server_started.emit()
 	print("Server started.")
 
 func connect_to_server(ip_address: String = "127.0.0.1") -> void:
@@ -79,6 +81,8 @@ func connect_to_server(ip_address: String = "127.0.0.1") -> void:
 	multiplayer.multiplayer_peer = peer
 
 func disconnect_network() -> void:
+	Util.main.reset()
+	
 	multiplayer.multiplayer_peer = null
 	
 	if multiplayer.peer_connected.is_connected(_on_peer_connected): multiplayer.peer_connected.disconnect(_on_peer_connected)

@@ -4,10 +4,12 @@ class_name Character extends RigidBody3D
 signal spawned_on_peer(peer_id: int, character: Character)
 signal jumped()
 signal landed(force: float)
-signal killed()
+signal killed(character: Character)
 
 signal water_entered()
 signal water_exited()
+
+signal weapon_changed()
 
 # (({[%%%(({[=======================================================================================================================]}))%%%]}))
 enum CharacterFlag {
@@ -35,6 +37,11 @@ enum CharacterFlag {
 
 @onready var gun_base: GunBase = $GunBarrelIKTarget/GunBase
 
+@onready var shield_model: MeshInstance3D = $BodyContainer/MeshInstance3D4
+
+@onready var inventory: Inventory = $Inventory
+
+@onready var shield_recharge_audio_player: AudioStreamPlayer3D = $ShieldRechargeAudioPlayer
 
 ## FLAGS
 @export var flags: int
@@ -87,6 +94,25 @@ var gravity = ProjectSettings.get_setting("physics/3d/default_gravity")
 @export var l_hand_ik_target_target: Vector3
 @export var r_hand_ik_target_target: Vector3
 
+## STATS
+@export var max_health: float = 40.0
+@export var health: float = max_health
+@export var max_shields: float = 100.0
+@export var shields = max_shields
+@export var shield_recharged_per_second: float = 20.0
+@export var shield_recharge_delay: float = 3.0
+@export var shield_recharge_timer: float
+
+@export var shields_down: bool
+@export var shields_charging: bool
+
+# DATA
+## There is supposed to be a base class that both PlayerController and AIController derive from, but I don't need it for this game, and I am LAZY!!!
+@export var controller: PlayerController
+
+## TEMP
+@onready var damageable_area_3d: DamageableArea3D = $DamageableArea3D
+
 # (({[%%%(({[=======================================================================================================================]}))%%%]}))
 func is_flag_on(flag: CharacterFlag) -> bool: return Util.is_flag_on(flags, flag)
 func set_flag_on(flag: CharacterFlag) -> void: flags = Util.set_flag_on(flags, flag)
@@ -94,12 +120,35 @@ func set_flag_off(flag: CharacterFlag) -> void: flags = Util.set_flag_off(flags,
 func set_flag(flag: CharacterFlag, active: bool) -> void: flags = Util.set_flag(flags, flag, active)
 
 # (({[%%%(({[=======================================================================================================================]}))%%%]}))
+func _enter_tree() -> void:
+	set_multiplayer_authority(get_parent().get_multiplayer_authority())
+
+func _ready() -> void:
+	damageable_area_3d.source = self
+	gun_base.equipped_to_character = self
+	
+	if is_multiplayer_authority():
+		inventory.init()
+
 func _physics_process(delta: float) -> void:
 	if !vehicle:
 		_update_movement(delta)
 		_update_aim(delta)
+		_update_stats(delta)
 	else:
 		pass # Send inputs to vehicle, just like how Controller sends input to Character
+
+func _process(delta: float) -> void:
+	if shield_recharge_timer != 0.0: return
+	if shields == max_shields: return
+	var shield_percent: float = shields * 0.01
+	
+	shield_recharge_audio_player.pitch_scale = shield_percent + 0.01
+	
+	if shield_percent > 0.5:
+		shield_recharge_audio_player.volume_db = ((1.0 - shield_percent) * 5.0) * 200.0 - 200.0
+	else:
+		shield_recharge_audio_player.volume_db = 0.0
 
 # (({[%%%(({[=======================================================================================================================]}))%%%]}))
 func face_direction(direction: Vector3, delta: float) -> void:
@@ -111,6 +160,28 @@ func look_in_direction(look_basiss: Basis, _delta: float) -> void:
 	$BodyContainer/MeshInstance3D.global_basis = look_basiss
 
 # (({[%%%(({[=======================================================================================================================]}))%%%]}))
+func _update_stats(delta: float) -> void:
+	if is_multiplayer_authority():
+		shield_recharge_timer = clampf(shield_recharge_timer - delta, 0.0, shield_recharge_delay)
+		if shield_recharge_timer == 0.0:
+			shields = clampf(shields + delta * shield_recharged_per_second, 0.0, max_shields)
+			if !shields_charging && shields != max_shields: start_shield_regen_sound()
+	if shields == max_shields:
+		shields_charging = false
+		shield_recharge_audio_player.stop()
+	
+	var shield_percent: float = shields * 0.01
+	shield_model.get_surface_override_material(0).albedo_color.a8 = shield_percent * 200.0
+	#shield_model.get_surface_override_material(0).set_shader_parameter("fresnel_sharpness", 9.0 - shield_percent * 8.0)
+	#shield_model.get_surface_override_material(0).set_shader_parameter("extend_distance", -0.1 + shield_percent * 0.14)
+	
+	if shields <= 0.0 && !shields_down:
+		shields_down = true
+		shields_charging = false
+		SoundManager.play_pitched_3d_sfx(12, SoundDatabase.SoundType.SFX_EXPLOSION, global_position)
+	elif shields > 0.0 && shields_down:
+		shields_down = false
+
 func _update_aim(delta: float) -> void:
 	if !is_multiplayer_authority(): return
 	
@@ -140,6 +211,7 @@ func _update_aim(delta: float) -> void:
 		if is_instance_valid(gun_base.model.l_hand_grip): l_hand_ik_target.global_position = gun_base.model.l_hand_grip.global_position
 		if is_instance_valid(gun_base.model.r_hand_grip): r_hand_ik_target.global_position = gun_base.model.r_hand_grip.global_position
 
+# (({[%%%(({[=======================================================================================================================]}))%%%]}))
 func snap_gun_aim() -> void:
 	var look_recoil: Vector3 = (gun_barrel_angular_recoil_modifier.x * gun_barrel_ik_target.global_basis.x + gun_barrel_angular_recoil_modifier.y * gun_barrel_ik_target.global_basis.y)
 	
@@ -147,6 +219,12 @@ func snap_gun_aim() -> void:
 	gun_barrel_look_direction = gun_barrel_look_direction_target + look_recoil
 	gun_barrel_ik_target.look_at(gun_barrel_ik_target.global_position + gun_barrel_look_direction)
 
+func start_shield_regen_sound() -> void:
+	print("start")
+	shields_charging = true
+	shield_recharge_audio_player.play()
+
+# (({[%%%(({[=======================================================================================================================]}))%%%]}))
 func _update_movement(delta: float) -> void:
 	if is_flag_on(CharacterFlag.CROUCH):
 		current_speed = crouch_speed
@@ -230,6 +308,7 @@ func _update_movement_grounded(delta: float) -> void:
 	
 	last_velocity = linear_velocity
 
+# (({[%%%(({[=======================================================================================================================]}))%%%]}))
 func _update_upright_rotation() -> void:
 	var look_transform: Transform3D = Transform3D.IDENTITY
 
@@ -295,3 +374,66 @@ func _update_ride_force() -> void:
 	else:
 		set_flag_off(CharacterFlag.GROUNDED)
 		constant_force = Vector3.ZERO
+
+# (({[%%%(({[=======================================================================================================================]}))%%%]}))
+func _on_damageable_area_3d_damaged(damage_data: DamageData, area_id: int, _source: Node) -> void:
+	if !is_multiplayer_authority():
+		_rpc_deal_damage.rpc_id(get_multiplayer_authority(), damage_data.damage_strength, area_id)
+	else:
+		_deal_damage(damage_data.damage_strength, area_id)
+
+@rpc("any_peer", "call_remote", "unreliable")
+func _rpc_deal_damage(damage_strength: float, area_id: int) -> void:
+	_deal_damage(damage_strength, area_id)
+
+func _deal_damage(damage_strength: float, _area_id: int) -> void:
+	print("[Peer %s] Character damaged on [Peer %s]" % [get_multiplayer_authority(), multiplayer.get_unique_id()])
+	
+	shield_recharge_timer = shield_recharge_delay
+	shields_charging = false
+	
+	var damage_left: float = damage_strength
+	var damage_to_shields: float = clampf(damage_strength, 0.0, shields)
+	shields -= damage_to_shields
+	damage_left -= damage_to_shields
+	print("Shields: %s" % shields)
+	
+	if damage_left <= 0.0: return
+	
+	health -= damage_left
+	print("Health: %s" % health)
+	
+	if health <= 0.0: die()
+
+func die() -> void:
+	drop_weapon()
+	killed.emit(self)
+	inventory.drop_contents()
+	queue_free()
+
+func get_matter_id_for_damageable_area_3d(_area_id: int) -> int:
+	if shields > 0.0:
+		return 1
+	else:
+		return 0
+
+func equip(equippable: EquippableBase) -> void:
+	drop_weapon()
+	
+	gun_base.data_id = equippable.gun_data_id
+	
+	if equippable.metadata.has("rounds"): gun_base.rounds = equippable.metadata["rounds"]
+	if equippable.metadata.has("fire_mode_index"): gun_base.fire_mode_index = equippable.metadata["fire_mode_index"]
+	equippable.destroy()
+	
+	weapon_changed.emit()
+
+func drop_weapon() -> void:
+	if gun_base.data_id == 0: return
+	SpawnManager.spawn_equippable(
+		gun_base.data_id, {
+			"rounds" = gun_base.rounds,
+			"fire_mode_index" = gun_base.fire_mode_index,
+		},
+		global_position)
+	gun_base.data_id = 0

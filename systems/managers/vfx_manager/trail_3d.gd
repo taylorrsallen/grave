@@ -11,7 +11,7 @@ var _lifespans = [] ## Stores all the trail points lifespans
 @export var _to_width: float = 0.0 ## End width of the trail
 @export_range(0.5, 1.5) var _scale_acceleration: float = 1.0 ## Speed of the scaling
 
-@export var _motion_delta: float = 0.1 ## Sets the smoothness of the trail, how long it will take for a new trail piece to be made
+#@export var _motion_delta: float = 0.1 ## Sets the smoothness of the trail, how long it will take for a new trail piece to be made
 @export var _lifespan: float = 1.0 ## Sets the duration until this part of the trail is no longer used, and is thus removed
 
 @export var _start_color: Color = Color(1.0, 1.0, 1.0, 1.0) ## Starting color of the trail
@@ -19,19 +19,29 @@ var _lifespans = [] ## Stores all the trail points lifespans
 
 var _old_pos: Vector3
 
+@export var append_point_time: float = 0.025
+var append_point_timer: float
+
 # (({[%%%(({[=======================================================================================================================]}))%%%]}))
 func _ready() -> void:
 	_old_pos = global_position
 	mesh = ImmediateMesh.new()
 
 func _physics_process(delta: float) -> void:
-	if (_old_pos - global_position).length() > _motion_delta && _trail_enabled:
+	if _trail_enabled: append_point_timer += delta
+	if append_point_timer >= append_point_time:
+		append_point_timer -= append_point_time
 		append_point()
 		_old_pos = global_position
+	
+	#if (_old_pos - global_position).length() > _motion_delta && _trail_enabled:
+		#append_point()
+		#_old_pos = global_position
 	
 	var p: int = 0
 	var max_points: int = _points.size()
 	while p < max_points:
+		_points[p].y += delta * randf_range(0.5, 1.0)
 		_lifespans[p] += delta
 		if _lifespans[p] > _lifespan:
 			remove_point(p)

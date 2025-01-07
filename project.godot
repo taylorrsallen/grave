@@ -12,15 +12,22 @@ config_version=5
 
 config/name="grave"
 run/main_scene="res://systems/managers/main.scn"
-config/features=PackedStringArray("4.3", "Forward Plus")
+config/features=PackedStringArray("4.4", "Forward Plus")
 config/icon="res://assets/sprites/icons/ikthia.png"
 
 [autoload]
 
 SoundManager="*res://systems/managers/sound_manager/sound_manager.gd"
-SpawnManager="*res://systems/managers/spawn_manager.gd"
+SpawnManager="*res://systems/managers/spawn_manager/spawn_manager.gd"
 VfxManager="*res://systems/managers/vfx_manager/vfx_manager.gd"
 AreaQueryManager="*res://systems/managers/area_query_manager.gd"
+EventBus="*res://systems/managers/event_bus.gd"
+
+[debug]
+
+gdscript/warnings/unused_signal=0
+gdscript/warnings/integer_division=0
+gdscript/warnings/narrowing_conversion=0
 
 [file_customization]
 
@@ -268,3 +275,4 @@ equip_3={
 3d_physics/layer_1="TERRAIN"
 3d_physics/layer_2="CHARACTER_NAVIGATION"
 3d_physics/layer_3="DAMAGEABLE_AREA"
+3d_physics/layer_4="EQUIPPABLE"

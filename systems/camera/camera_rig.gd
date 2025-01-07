@@ -1,5 +1,4 @@
-extends Node3D
-class_name CameraRig
+class_name CameraRig extends Node3D
 
 # (({[%%%(({[=======================================================================================================================]}))%%%]}))
 enum ControlMode {

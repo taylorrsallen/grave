@@ -39,6 +39,11 @@ const ASSET_DIR: String = GAME_DIR + "assets/"
 const RESOURCE_DIR: String = GAME_DIR + "resources/"
 const ICONS_DIR: String = ASSET_DIR + ICONS_FOLDER
 
+# DATABASES
+static var MATTER_DATABASE: MatterDatabase = load("res://resources/matter/matter_database.res")
+static var BULLET_DATABASE: BulletDatabase = load("res://resources/projectiles/bullet_database.res")
+static var GUN_DATABASE: GunDatabase = load("res://resources/weapons/guns/gun_database.res")
+
 # (({[%%%(({[=======================================================================================================================]}))%%%]}))
 static var main: Main
 

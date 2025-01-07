@@ -7,8 +7,11 @@ const PLAYER_CONTROLLER = preload("res://systems/controller/player/player_contro
 @export var player_controllers: Array[PlayerController] = []
 
 # (({[%%%(({[=======================================================================================================================]}))%%%]}))
+func _enter_tree() -> void:
+	set_multiplayer_authority(name.to_int())
+
 func _ready() -> void:
-	if multiplayer.is_server(): try_create_player_controller()
+	if is_multiplayer_authority(): try_create_player_controller()
 
 # (({[%%%(({[=======================================================================================================================]}))%%%]}))
 func try_create_player_controller() -> PlayerController:

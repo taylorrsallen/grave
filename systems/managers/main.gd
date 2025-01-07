@@ -4,13 +4,20 @@ class_name Main extends Node
 @onready var peer_connections_box: HBoxContainer = $PeerConnectionsBox
 
 @onready var network_manager: NetworkManager = $NetworkManager
+@onready var npcs: Node = $NPCs
+@onready var server_objects: Node = $ServerObjects
 @onready var level: Node = $Level
+
+@onready var v_box_container: VBoxContainer = $VBoxContainer
 
 ## DEBUG
 @export var debug: bool = false
 
+@onready var start_game: Button = $VBoxContainer/StartGame
+
 # (({[%%%(({[=======================================================================================================================]}))%%%]}))
 func _ready() -> void:
+	network_manager.server_started.connect(_on_server_started)
 	network_manager.state_changed.connect(_refresh_ui)
 	Util.main = self
 	
@@ -45,3 +52,17 @@ func _refresh_ui() -> void:
 			var owner_label: Label = Label.new()
 			owner_label.text = "This is you!"
 			peer_con_vbox.add_child(owner_label)
+
+func _on_server_started() -> void:
+	start_game.show()
+
+func _on_start_game_pressed() -> void:
+	EventBus.start_game()
+
+func reset() -> void:
+	for child in npcs.get_children():
+		if child is MultiplayerSpawner: continue
+		child.free()
+	for child in server_objects.get_children():
+		if child is MultiplayerSpawner: continue
+		child.free()
